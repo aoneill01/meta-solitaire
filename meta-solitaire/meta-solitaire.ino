@@ -19,7 +19,7 @@ typedef struct HsvColor
     unsigned char v;
 } HsvColor;
 
-enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame, displayMenu };
+enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame };
 // State of the game.
 GameMode mode = dealing;
 GameMode prevMode;
@@ -80,12 +80,22 @@ unsigned int menuHeight = 4;
 
 const char easyOption[] = "Easy game";
 const char hardOption[] = "Hard game";
-const char statisticsOption[] = "Statistics";
 const char* const newGameMenu[3] = {
   easyOption,
-  hardOption,
-  statisticsOption
+  hardOption
 };
+
+const char resumeOption[] = "Resume";
+const char newGameOption[] = "New game";
+const char undoOption[] = "Undo";
+const char* const pauseMenu[3] = {
+  resumeOption,
+  newGameOption,
+  undoOption
+};
+
+const uint16_t patternA[] = {0x0045, 0x0118, 0x0000};
+const uint16_t patternB[] = {0x0045, 0x0108, 0x0000};
 
 void setup() {
   gb.begin();
@@ -113,12 +123,11 @@ void setup() {
   stockDeck.isTableau = false;
 
   setupNewGame();
-
+  
   // testWinningAnimation();
 }
 
 void setupNewGame() {
-
   talonDeck.empty();
   stockDeck.newDeck();
   stockDeck.shuffle();
@@ -128,6 +137,10 @@ void setupNewGame() {
   for (int i = 0; i < 7; i++) {
     tableau[i].empty();
   }
+
+  // Put the cursor at the stock.
+  activeLocation = stock;
+  getCursorDestination(cursorX, cursorY, false);
 
   // Initialize the data structure to deal out the initial board.
   cardAnimationCount = 0;
@@ -147,6 +160,9 @@ void setupNewGame() {
   }
   cardAnimationCount = 0;
 
+  drawBoard();
+  // Determine easy or hard game.
+  cardsToDraw = menu(newGameMenu, 2, false) == 0 ? 1 : 3;
   mode = dealing; 
 }
 
@@ -177,21 +193,18 @@ void loop() {
     }
 
     if (gb.buttons.pressed(BUTTON_MENU)) {
-      menu(newGameMenu, 3);
-      //gb.menu(newGameMenu, 3);
-      /*
-      if (mode == displayMenu) {
-        mode = prevMode;
+      switch (menu(pauseMenu, (!undo.isEmpty() && mode == selecting) ? 3 : 2, true)) {
+        case 1: 
+          setupNewGame();
+          return;
+        case 2:
+          performUndo();
+          break;
       }
-      else {
-        menuWidth = menuHeight = 4;
-        prevMode = mode;
-        mode = displayMenu;
-      }*/
     }
 
     // Draw the board.
-    if (mode != wonGame && mode != displayMenu) {
+    if (mode != wonGame) {
       drawBoard();      
     }
     
@@ -204,10 +217,9 @@ void loop() {
       case illegalMove:
       case fastFoundation: drawIllegalMove(); break;
       case wonGame: drawWonGame(); break;
-      case displayMenu: drawMenu(); break;
     }
 
-    displayCpuLoad();
+    // displayCpuLoad();
   }
 }
 
@@ -223,17 +235,17 @@ void displayCpuLoad() {
 void handleSelectingButtons() {
   // Handle buttons when user is using the arrow cursor to navigate.
   Location originalLocation = activeLocation;
-  if (gb.buttons.pressed(BUTTON_RIGHT)) {
+  if (gb.buttons.repeat(BUTTON_RIGHT, 8)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {
       activeLocation = (Location)(activeLocation + 1);
     }
   }
-  if (gb.buttons.pressed(BUTTON_LEFT)) {
+  if (gb.buttons.repeat(BUTTON_LEFT, 8)) {
     if (activeLocation != stock && activeLocation != tableau1) {
       activeLocation = (Location)(activeLocation - 1);
     }
   }
-  if (gb.buttons.pressed(BUTTON_DOWN)) {
+  if (gb.buttons.repeat(BUTTON_DOWN, 8)) {
     if (cardIndex > 0) {
       cardIndex--;
     }
@@ -242,7 +254,7 @@ void handleSelectingButtons() {
       else if (activeLocation <= foundation4) activeLocation = (Location)(activeLocation + 7);
     }
   }
-  if (gb.buttons.pressed(BUTTON_UP)) {
+  if (gb.buttons.repeat(BUTTON_UP, 8)) {
     bool interPileNavigation = false;
     if (activeLocation >= tableau1 && activeLocation <= tableau7) {
       Pile *pile = getActiveLocationPile();
@@ -338,21 +350,21 @@ void handleSelectingButtons() {
 
 void handleMovingPileButtons() {
   // Handle buttons when user is moving a pile of cards.
-  if (gb.buttons.pressed(BUTTON_RIGHT)) {
+  if (gb.buttons.repeat(BUTTON_RIGHT, 8)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {
       activeLocation = (Location)(activeLocation + 1);
     }
   }
-  if (gb.buttons.pressed(BUTTON_LEFT)) {
+  if (gb.buttons.repeat(BUTTON_LEFT, 8)) {
     if (activeLocation != talon && activeLocation != tableau1) {
       activeLocation = (Location)(activeLocation - 1);
     }
   }
-  if (gb.buttons.pressed(BUTTON_DOWN)) {
+  if (gb.buttons.repeat(BUTTON_DOWN, 8)) {
     if (activeLocation == talon) activeLocation = tableau2;
     else if (activeLocation <= foundation4) activeLocation = (Location)(activeLocation + 7);
   }
-  if (gb.buttons.pressed(BUTTON_UP)) {
+  if (gb.buttons.repeat(BUTTON_UP, 8)) {
     if (activeLocation >= tableau4) activeLocation = (Location)(activeLocation - 7);
     else if (activeLocation >= tableau1) activeLocation = talon;
   }
@@ -510,7 +522,7 @@ void drawBoard() {
 void drawDealing() {
   if (cardAnimationCount < 28 && gb.frameCount % 4 == 0) {
     cardAnimationCount++;
-    // playSoundA();
+    playSoundA();
   }
   bool doneDealing = cardAnimationCount == 28;
   for (int i = 0; i < cardAnimationCount; i++) {
@@ -608,6 +620,7 @@ void drawWonGame() {
   if (bounce.y + (14 << 8) > gb.display.width() << 8) {
     bounce.y = (gb.display.height() - 14) << 8;
     bounce.yVelocity = bounce.yVelocity * -4 / 5;
+    playSoundB();
   }
   drawCard(bounce.x >> 8, bounce.y >> 8, bounce.card);
   // Check to see if the current card is off the screen.
@@ -790,11 +803,11 @@ void drawValue(int16_t x, int16_t y, Value value, bool isRed) {
 }
 
 void playSoundA() {
-  // TODO
+  gb.sound.play(patternA);
 }
 
 void playSoundB() {
-  // TODO
+  gb.sound.play(patternB);
 }
 
 void drawAndFlip(Pile *source, Pile *destination) {
@@ -833,39 +846,7 @@ void performUndo() {
   }
 }
 
-
-void drawMenu() {
-  unsigned int top, left;
-
-  if (menuHeight < gb.display.height() - 10) {
-    menuWidth += 4;
-    menuHeight += 4;
-  }
-  
-  top = (gb.display.height() - menuHeight) / 2;
-  left = (gb.display.width() - menuWidth) / 2;
-
-  gb.display.setColor(WHITE);
-  gb.display.drawFastHLine(left, top, menuWidth - 1);
-  gb.display.drawFastVLine(left, top + 1, menuHeight - 2);
-  gb.display.drawFastHLine(left + 2, top + menuHeight - 2, menuWidth - 3);
-  gb.display.drawFastVLine(left + menuWidth - 2, top + 2, menuHeight - 4);
-
-  gb.display.setColor(BROWN);
-  gb.display.drawFastHLine(left + 1, top + 1, menuWidth - 3);
-  gb.display.drawFastVLine(left + 1, top + 2, menuHeight - 4);
-  gb.display.drawFastHLine(left + 1, top + menuHeight - 1, menuWidth - 1);
-  gb.display.drawFastVLine(left + menuWidth - 1, top + 1, menuHeight - 2);
-
-  gb.display.setColor(BEIGE);
-  gb.display.drawPixel(left + menuWidth - 1, top);
-  gb.display.drawPixel(left + menuWidth - 2, top + 1);
-  gb.display.drawPixel(left, top + menuHeight - 1);
-  gb.display.drawPixel(left + 1, top + menuHeight - 2);
-  gb.display.fillRect(left + 2, top + 2, menuWidth - 4, menuHeight - 4);
-}
-
-int menu(const char* const* items, int length) {
+int menu(const char* const* items, int length, bool allowExit) {
   int width = 0, height = 0;
   int activeItem = 0;
 
@@ -880,15 +861,22 @@ int menu(const char* const* items, int length) {
 
   while (true) {
     if (gb.update()) {
-      if (gb.buttons.pressed(BUTTON_MENU)) {
+      if (gb.buttons.pressed(BUTTON_A)) {
+        gb.sound.playOK();
         return activeItem;
       }
-
-      if (gb.buttons.repeat(Button::down,4)) {
-        activeItem++;
+      if (allowExit && (gb.buttons.pressed(BUTTON_MENU) || gb.buttons.pressed(BUTTON_B))) {
+        gb.sound.playCancel();
+        return -1;
       }
-      if (gb.buttons.repeat(Button::up,4)) {
+
+      if (gb.buttons.repeat(BUTTON_DOWN, 8)) {
+        activeItem++;
+        gb.sound.playTick();
+      }
+      if (gb.buttons.repeat(BUTTON_UP, 8)) {
         activeItem--;
+        gb.sound.playTick();
       }
       //don't go out of the menu
       if (activeItem == length) activeItem = 0;
@@ -935,7 +923,6 @@ void drawMenuBox(int width, int height) {
   gb.display.drawPixel(left + 1, top + height - 2);
   gb.display.fillRect(left + 2, top + 2, width - 4, height - 4);
 }
-
 
 RgbColor HsvToRgb(HsvColor hsv)
 {

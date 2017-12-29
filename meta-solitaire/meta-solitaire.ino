@@ -19,9 +19,10 @@ typedef struct HsvColor
     unsigned char v;
 } HsvColor;
 
-enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame };
+enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame, displayMenu };
 // State of the game.
 GameMode mode = dealing;
+GameMode prevMode;
 
 // Stock: where you draw cards from
 // Talon: drawn cards
@@ -73,6 +74,18 @@ CardBounce bounce;
 byte bounceIndex;
 
 int easyGameCount, easyGamesWon, hardGameCount, hardGamesWon;
+
+unsigned int menuWidth = 4;
+unsigned int menuHeight = 4;
+
+const char easyOption[] = "Easy game";
+const char hardOption[] = "Hard game";
+const char statisticsOption[] = "Statistics";
+const char* const newGameMenu[3] = {
+  easyOption,
+  hardOption,
+  statisticsOption
+};
 
 void setup() {
   gb.begin();
@@ -157,15 +170,29 @@ void testWinningAnimation() {
 
 void loop() {
   if (gb.update()) {
-    // Draw the board.
-    if (mode != wonGame) {
-      drawBoard();      
-    }
-
     // Handle key presses for various modes.
     switch (mode) {
       case selecting: handleSelectingButtons(); break;
       case movingPile: handleMovingPileButtons(); break;
+    }
+
+    if (gb.buttons.pressed(BUTTON_MENU)) {
+      menu(newGameMenu, 3);
+      //gb.menu(newGameMenu, 3);
+      /*
+      if (mode == displayMenu) {
+        mode = prevMode;
+      }
+      else {
+        menuWidth = menuHeight = 4;
+        prevMode = mode;
+        mode = displayMenu;
+      }*/
+    }
+
+    // Draw the board.
+    if (mode != wonGame && mode != displayMenu) {
+      drawBoard();      
     }
     
     // Draw other things based on the current state of the game.
@@ -177,6 +204,7 @@ void loop() {
       case illegalMove:
       case fastFoundation: drawIllegalMove(); break;
       case wonGame: drawWonGame(); break;
+      case displayMenu: drawMenu(); break;
     }
 
     displayCpuLoad();
@@ -806,6 +834,107 @@ void performUndo() {
 }
 
 
+void drawMenu() {
+  unsigned int top, left;
+
+  if (menuHeight < gb.display.height() - 10) {
+    menuWidth += 4;
+    menuHeight += 4;
+  }
+  
+  top = (gb.display.height() - menuHeight) / 2;
+  left = (gb.display.width() - menuWidth) / 2;
+
+  gb.display.setColor(WHITE);
+  gb.display.drawFastHLine(left, top, menuWidth - 1);
+  gb.display.drawFastVLine(left, top + 1, menuHeight - 2);
+  gb.display.drawFastHLine(left + 2, top + menuHeight - 2, menuWidth - 3);
+  gb.display.drawFastVLine(left + menuWidth - 2, top + 2, menuHeight - 4);
+
+  gb.display.setColor(BROWN);
+  gb.display.drawFastHLine(left + 1, top + 1, menuWidth - 3);
+  gb.display.drawFastVLine(left + 1, top + 2, menuHeight - 4);
+  gb.display.drawFastHLine(left + 1, top + menuHeight - 1, menuWidth - 1);
+  gb.display.drawFastVLine(left + menuWidth - 1, top + 1, menuHeight - 2);
+
+  gb.display.setColor(BEIGE);
+  gb.display.drawPixel(left + menuWidth - 1, top);
+  gb.display.drawPixel(left + menuWidth - 2, top + 1);
+  gb.display.drawPixel(left, top + menuHeight - 1);
+  gb.display.drawPixel(left + 1, top + menuHeight - 2);
+  gb.display.fillRect(left + 2, top + 2, menuWidth - 4, menuHeight - 4);
+}
+
+int menu(const char* const* items, int length) {
+  int width = 0, height = 0;
+  int activeItem = 0;
+
+  // Animate menu opening.
+  while (width < gb.display.height() - 10) {
+    if (gb.update()) {
+      width += 6;
+      height += 6;
+      drawMenuBox(width, height);
+    }
+  }
+
+  while (true) {
+    if (gb.update()) {
+      if (gb.buttons.pressed(BUTTON_MENU)) {
+        return activeItem;
+      }
+
+      if (gb.buttons.repeat(Button::down,4)) {
+        activeItem++;
+      }
+      if (gb.buttons.repeat(Button::up,4)) {
+        activeItem--;
+      }
+      //don't go out of the menu
+      if (activeItem == length) activeItem = 0;
+      if (activeItem < 0) activeItem = length - 1;
+
+      drawMenuBox(width, height);
+      int top = (gb.display.height() - height) / 2;
+      int left = (gb.display.width() - width) / 2;
+
+      gb.display.setCursor(left + 7, top + 5);
+      for (int i = 0; i < length; i++) {
+        gb.display.cursorX = left + 7;
+        gb.display.setColor(BROWN);
+        if (i == activeItem){
+          gb.display.setColor(BLACK);
+          gb.display.cursorX = left + 5;
+        }
+        gb.display.println((const char*)items[i]);
+      }
+    }
+  }
+}
+
+void drawMenuBox(int width, int height) {
+  int top = (gb.display.height() - height) / 2;
+  int left = (gb.display.width() - width) / 2;
+
+  gb.display.setColor(WHITE);
+  gb.display.drawFastHLine(left, top, width - 1);
+  gb.display.drawFastVLine(left, top + 1, height - 2);
+  gb.display.drawFastHLine(left + 2, top + height - 2, width - 3);
+  gb.display.drawFastVLine(left + width - 2, top + 2, height - 4);
+
+  gb.display.setColor(BROWN);
+  gb.display.drawFastHLine(left + 1, top + 1, width - 3);
+  gb.display.drawFastVLine(left + 1, top + 2, height - 4);
+  gb.display.drawFastHLine(left + 1, top + height - 1, width - 1);
+  gb.display.drawFastVLine(left + width - 1, top + 1, height - 2);
+
+  gb.display.setColor(BEIGE);
+  gb.display.drawPixel(left + width - 1, top);
+  gb.display.drawPixel(left + width - 2, top + 1);
+  gb.display.drawPixel(left, top + height - 1);
+  gb.display.drawPixel(left + 1, top + height - 2);
+  gb.display.fillRect(left + 2, top + 2, width - 4, height - 4);
+}
 
 
 RgbColor HsvToRgb(HsvColor hsv)

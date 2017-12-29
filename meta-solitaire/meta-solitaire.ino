@@ -140,7 +140,8 @@ void setupNewGame() {
 
   // Put the cursor at the stock.
   activeLocation = stock;
-  getCursorDestination(cursorX, cursorY, false);
+  bool unused;
+  getCursorDestination(cursorX, cursorY, unused);
 
   // Initialize the data structure to deal out the initial board.
   cardAnimationCount = 0;

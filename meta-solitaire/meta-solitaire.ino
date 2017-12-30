@@ -2,22 +2,9 @@
 #include "sprites.h"
 #include "pile.h"
 #include "undo.h"
+#include "utils.h"
 
 #define MAX_CARDS_DRAWN_IN_PILE 15
-
-struct RgbColor
-{
-    unsigned char r;
-    unsigned char g;
-    unsigned char b;
-};
-
-struct HsvColor
-{
-    unsigned char h;
-    unsigned char s;
-    unsigned char v;
-};
 
 enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame };
 // State of the game.
@@ -90,9 +77,6 @@ byte bounceIndex;
 
 int easyGameCount, easyGamesWon, hardGameCount, hardGamesWon;
 
-unsigned int menuWidth = 4;
-unsigned int menuHeight = 4;
-
 const char easyOption[] = "Easy game";
 const char hardOption[] = "Hard game";
 const char* const newGameMenu[3] = {
@@ -115,7 +99,6 @@ const uint16_t patternB[] = {0x0045, 0x0108, 0x0000};
 void setup() {
   gb.begin();
   gb.setFrameRate(30);
-  // gb.pickRandomSeed(); //pick a different random seed each time for games to be different
 
   initSprites();
   
@@ -143,6 +126,8 @@ void setup() {
 }
 
 void setupNewGame() {
+  gb.lights.fill(BLACK);
+  
   talonDeck.empty();
   stockDeck.newDeck();
   stockDeck.shuffle();
@@ -212,7 +197,7 @@ void loop() {
     
     // Draw other things based on the current state of the game.
     drawJumpTable[mode]();
-    
+
     // displayCpuLoad();
   }
 }
@@ -240,8 +225,6 @@ void handleCommonButtons() {
 }
 
 void handleSelectingButtons() {
-  handleCommonButtons();
-  
   // Handle buttons when user is using the arrow cursor to navigate.
   Location originalLocation = activeLocation;
   if (gb.buttons.repeat(BUTTON_RIGHT, 8)) {
@@ -355,11 +338,11 @@ void handleSelectingButtons() {
     }
   }
   if (originalLocation != activeLocation) cardIndex = 0;
+
+  handleCommonButtons();
 }
 
 void handleMovingPileButtons() {
-  handleCommonButtons();
-  
   // Handle buttons when user is moving a pile of cards.
   if (gb.buttons.repeat(BUTTON_RIGHT, 8)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {
@@ -444,6 +427,8 @@ void handleMovingPileButtons() {
         break;
     }
   }
+
+  handleCommonButtons();
 }
 
 void moveCards() {
@@ -615,25 +600,21 @@ void drawWonGame() {
   bounce.x += bounce.xVelocity;
   bounce.y += bounce.yVelocity;
 
-  int val = bounce.y * 255 * 4 / ((gb.display.height() - 14) << 8);
+  // If the card is at the bottom of the screen, reverse the y velocity and scale by 80%.
+  if (bounce.y + (14 << 8) > gb.display.width() << 8) {
+    bounce.y = (gb.display.height() - 14) << 8;
+    bounce.yVelocity = -bounce.yVelocity * 4 / 5;
+    playSoundB();
+  }
+  drawCard(bounce.x >> 8, bounce.y >> 8, bounce.card);
+
+  int val = (bounce.y * 255)* 3 / ((gb.display.height() - 14) << 8);
   for (int i = 0; i < 4; i++) {
-    HsvColor hsv;
-    hsv.s = 255;
-    hsv.h = gb.frameCount % 256;
-    hsv.v = max(255 - abs(i * 255 - val), 0);
-    RgbColor rgb = HsvToRgb(hsv);
-    Color c = (Color)(((rgb.r & 0xF8) << 8) | ((rgb.g & 0xFC) << 3) | (rgb.b >> 3));
+    Color c = hsvToRgb565(gb.frameCount % 256, 255, max(255 - abs(i * 255 - val), 0));
     gb.lights.drawPixel(0, i, c);
     gb.lights.drawPixel(1, i, c);
   }
   
-  // If the card is at the bottom of the screen, reverse the y velocity and scale by 80%.
-  if (bounce.y + (14 << 8) > gb.display.width() << 8) {
-    bounce.y = (gb.display.height() - 14) << 8;
-    bounce.yVelocity = bounce.yVelocity * -4 / 5;
-    playSoundB();
-  }
-  drawCard(bounce.x >> 8, bounce.y >> 8, bounce.card);
   // Check to see if the current card is off the screen.
   if (bounce.x + (10 << 8) < 0 || bounce.x > gb.display.width() << 8) {
     if (!initializeCardBounce()) {
@@ -855,128 +836,5 @@ void performUndo() {
     }
     updateAfterPlay();
   }
-}
-
-int menu(const char* const* items, int length, bool allowExit) {
-  int width = 0, height = 0;
-  int activeItem = 0;
-
-  // Animate menu opening.
-  while (width < gb.display.height() - 10) {
-    if (gb.update()) {
-      width += 6;
-      height += 6;
-      drawMenuBox(width, height);
-    }
-  }
-
-  while (true) {
-    if (gb.update()) {
-      if (gb.buttons.pressed(BUTTON_A)) {
-        gb.sound.playOK();
-        return activeItem;
-      }
-      if (allowExit && (gb.buttons.pressed(BUTTON_MENU) || gb.buttons.pressed(BUTTON_B))) {
-        gb.sound.playCancel();
-        return -1;
-      }
-
-      if (gb.buttons.repeat(BUTTON_DOWN, 8)) {
-        activeItem++;
-        gb.sound.playTick();
-      }
-      if (gb.buttons.repeat(BUTTON_UP, 8)) {
-        activeItem--;
-        gb.sound.playTick();
-      }
-      //don't go out of the menu
-      if (activeItem == length) activeItem = 0;
-      if (activeItem < 0) activeItem = length - 1;
-
-      drawMenuBox(width, height);
-      int top = (gb.display.height() - height) / 2;
-      int left = (gb.display.width() - width) / 2;
-
-      gb.display.setCursor(left + 7, top + 5);
-      for (int i = 0; i < length; i++) {
-        gb.display.cursorX = left + 7;
-        gb.display.setColor(BROWN);
-        if (i == activeItem){
-          gb.display.setColor(BLACK);
-          gb.display.cursorX = left + 5;
-        }
-        gb.display.println((const char*)items[i]);
-      }
-    }
-  }
-}
-
-void drawMenuBox(int width, int height) {
-  int top = (gb.display.height() - height) / 2;
-  int left = (gb.display.width() - width) / 2;
-
-  gb.display.setColor(WHITE);
-  gb.display.drawFastHLine(left, top, width - 1);
-  gb.display.drawFastVLine(left, top + 1, height - 2);
-  gb.display.drawFastHLine(left + 2, top + height - 2, width - 3);
-  gb.display.drawFastVLine(left + width - 2, top + 2, height - 4);
-
-  gb.display.setColor(BROWN);
-  gb.display.drawFastHLine(left + 1, top + 1, width - 3);
-  gb.display.drawFastVLine(left + 1, top + 2, height - 4);
-  gb.display.drawFastHLine(left + 1, top + height - 1, width - 1);
-  gb.display.drawFastVLine(left + width - 1, top + 1, height - 2);
-
-  gb.display.setColor(BEIGE);
-  gb.display.drawPixel(left + width - 1, top);
-  gb.display.drawPixel(left + width - 2, top + 1);
-  gb.display.drawPixel(left, top + height - 1);
-  gb.display.drawPixel(left + 1, top + height - 2);
-  gb.display.fillRect(left + 2, top + 2, width - 4, height - 4);
-}
-
-RgbColor HsvToRgb(HsvColor hsv)
-{
-    RgbColor rgb;
-    unsigned char region, remainder, p, q, t;
-
-    if (hsv.s == 0)
-    {
-        rgb.r = hsv.v;
-        rgb.g = hsv.v;
-        rgb.b = hsv.v;
-        return rgb;
-    }
-
-    region = hsv.h / 43;
-    remainder = (hsv.h - (region * 43)) * 6; 
-
-    p = (hsv.v * (255 - hsv.s)) >> 8;
-    q = (hsv.v * (255 - ((hsv.s * remainder) >> 8))) >> 8;
-    t = (hsv.v * (255 - ((hsv.s * (255 - remainder)) >> 8))) >> 8;
-
-    switch (region)
-    {
-        case 0:
-            rgb.r = hsv.v; rgb.g = t; rgb.b = p;
-            break;
-        case 1:
-            rgb.r = q; rgb.g = hsv.v; rgb.b = p;
-            break;
-        case 2:
-            rgb.r = p; rgb.g = hsv.v; rgb.b = t;
-            break;
-        case 3:
-            rgb.r = p; rgb.g = q; rgb.b = hsv.v;
-            break;
-        case 4:
-            rgb.r = t; rgb.g = p; rgb.b = hsv.v;
-            break;
-        default:
-            rgb.r = hsv.v; rgb.g = p; rgb.b = q;
-            break;
-    }
-
-    return rgb;
 }
 

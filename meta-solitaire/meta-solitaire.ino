@@ -5,24 +5,39 @@
 
 #define MAX_CARDS_DRAWN_IN_PILE 15
 
-typedef struct RgbColor
+struct RgbColor
 {
     unsigned char r;
     unsigned char g;
     unsigned char b;
-} RgbColor;
+};
 
-typedef struct HsvColor
+struct HsvColor
 {
     unsigned char h;
     unsigned char s;
     unsigned char v;
-} HsvColor;
+};
 
 enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame };
 // State of the game.
 GameMode mode = dealing;
 GameMode prevMode;
+
+void drawDealing();
+void drawCursor();
+void drawDrawingCards();
+void drawMovingPile();
+void drawIllegalMove();
+void drawWonGame();
+typedef void(*DrawFunction)();
+DrawFunction drawJumpTable[] = { drawDealing, drawCursor, drawDrawingCards, drawMovingPile, drawIllegalMove, drawIllegalMove, drawWonGame };
+
+void handleSelectingButtons();
+void handleMovingPileButtons();
+void handleCommonButtons();
+typedef void(*ButtonHandler)();
+ButtonHandler buttonJumpTable[] = { handleCommonButtons, handleSelectingButtons, handleCommonButtons, handleMovingPileButtons, handleCommonButtons, handleCommonButtons, handleCommonButtons };
 
 // Stock: where you draw cards from
 // Talon: drawn cards
@@ -188,38 +203,16 @@ void testWinningAnimation() {
 void loop() {
   if (gb.update()) {
     // Handle key presses for various modes.
-    switch (mode) {
-      case selecting: handleSelectingButtons(); break;
-      case movingPile: handleMovingPileButtons(); break;
-    }
-
-    if (gb.buttons.pressed(BUTTON_MENU)) {
-      switch (menu(pauseMenu, (!undo.isEmpty() && mode == selecting) ? 3 : 2, true)) {
-        case 1: 
-          setupNewGame();
-          return;
-        case 2:
-          performUndo();
-          break;
-      }
-    }
-
+    buttonJumpTable[mode]();
+    
     // Draw the board.
     if (mode != wonGame) {
       drawBoard();      
     }
     
     // Draw other things based on the current state of the game.
-    switch(mode) {
-      case dealing: drawDealing(); break;
-      case selecting: drawCursor(); break;
-      case drawingCards: drawDrawingCards(); break;
-      case movingPile: drawMovingPile(); break;
-      case illegalMove:
-      case fastFoundation: drawIllegalMove(); break;
-      case wonGame: drawWonGame(); break;
-    }
-
+    drawJumpTable[mode]();
+    
     // displayCpuLoad();
   }
 }
@@ -233,7 +226,22 @@ void displayCpuLoad() {
   gb.display.print(gb.getCpuLoad());
 }
 
+void handleCommonButtons() {
+  if (gb.buttons.pressed(BUTTON_MENU)) {
+    switch (menu(pauseMenu, (!undo.isEmpty() && mode == selecting) ? 3 : 2, true)) {
+      case 1: 
+        setupNewGame();
+        return;
+      case 2:
+        performUndo();
+        break;
+    }
+  }
+}
+
 void handleSelectingButtons() {
+  handleCommonButtons();
+  
   // Handle buttons when user is using the arrow cursor to navigate.
   Location originalLocation = activeLocation;
   if (gb.buttons.repeat(BUTTON_RIGHT, 8)) {
@@ -350,6 +358,8 @@ void handleSelectingButtons() {
 }
 
 void handleMovingPileButtons() {
+  handleCommonButtons();
+  
   // Handle buttons when user is moving a pile of cards.
   if (gb.buttons.repeat(BUTTON_RIGHT, 8)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {

@@ -100,8 +100,6 @@ void setup() {
   gb.begin();
   gb.setFrameRate(30);
 
-  initSprites();
-  
   // Initialize positions of piles.
   for (int i = 0; i < 4; i++) {
     foundations[i].x = 35 + i * 11;

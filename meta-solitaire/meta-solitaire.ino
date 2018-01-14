@@ -330,7 +330,7 @@ void handleSelectingButtons() {
         if (sourcePile->getCardCount() == 0) break;
         moving.empty();
         moving.x = sourcePile->x;
-        moving.y = cardYPosition(sourcePile, 0);
+        moving.y = cardYPosition(sourcePile, 0) - 2 * (cardIndex + 1);
         sourcePile->removeCards(cardIndex + 1, &moving);
         mode = movingPile;
         playSoundA();

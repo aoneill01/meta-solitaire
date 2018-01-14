@@ -9,4 +9,3 @@ extern Image cursorImage;
 extern Image cursorDetailsImage;
 extern Image talonBackgroundImage;
 
-void initSprites();

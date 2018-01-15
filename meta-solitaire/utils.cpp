@@ -1,6 +1,8 @@
 #include <Gamebuino-Meta.h>
 #include "utils.h"
 
+#define LANG_COUNT 3
+
 // https://stackoverflow.com/questions/3018313/algorithm-to-convert-rgb-to-hsv-and-hsv-to-rgb-in-range-0-255-for-both#14733008
 Color hsvToRgb565(unsigned char h, unsigned char s, unsigned char v)
 {
@@ -71,7 +73,7 @@ void drawMenuBox(int width, int height) {
   gb.display.fillRect(left + 2, top + 2, width - 4, height - 4);
 }
 
-int menu(const char* const* items, int length, bool allowExit) {
+int menu(const MultiLang* const* items, int length, bool allowExit) {
   int width = 0, height = 0;
   int activeItem = 0;
 
@@ -119,7 +121,7 @@ int menu(const char* const* items, int length, bool allowExit) {
           gb.display.setColor(BLACK);
           gb.display.cursorX = left + 5;
         }
-        gb.display.println((const char*)items[i]);
+        gb.display.println(gb.language.get(items[i], LANG_COUNT));
       }
     }
   }

@@ -5,6 +5,7 @@
 #include "utils.h"
 
 #define MAX_CARDS_DRAWN_IN_PILE 15
+#define REPEAT_FRAMES 6
 
 enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame };
 // State of the game.
@@ -77,17 +78,37 @@ byte bounceIndex;
 
 int easyGameCount, easyGamesWon, hardGameCount, hardGamesWon;
 
-const char easyOption[] = "Easy game";
-const char hardOption[] = "Hard game";
-const char* const newGameMenu[3] = {
+const MultiLang easyOption[] = {
+  { Gamebuino_Meta::LangCode::en, "Easy game" },
+  { Gamebuino_Meta::LangCode::de, "Einfach" },
+  { Gamebuino_Meta::LangCode::fr, "Facile" }
+};
+const MultiLang hardOption[] = {
+  { Gamebuino_Meta::LangCode::en, "Hard game" },
+  { Gamebuino_Meta::LangCode::de, "Hart" },
+  { Gamebuino_Meta::LangCode::fr, "Difficile" }
+};
+const MultiLang* newGameMenu[2] = {
   easyOption,
   hardOption
 };
 
-const char resumeOption[] = "Resume";
-const char newGameOption[] = "New game";
-const char undoOption[] = "Undo";
-const char* const pauseMenu[3] = {
+const MultiLang resumeOption[] = {
+  { Gamebuino_Meta::LangCode::en, "Resume" },
+  { Gamebuino_Meta::LangCode::de, "Fortsetzen" },
+  { Gamebuino_Meta::LangCode::fr, "Reprendre" }
+};
+const MultiLang newGameOption[] = {
+  { Gamebuino_Meta::LangCode::en, "New game" },
+  { Gamebuino_Meta::LangCode::de, "Neu" },
+  { Gamebuino_Meta::LangCode::fr, "Nouveau" }
+};
+const MultiLang undoOption[] = {
+  { Gamebuino_Meta::LangCode::en, "Undo" },
+  { Gamebuino_Meta::LangCode::de, "Umkehren" },
+  { Gamebuino_Meta::LangCode::fr, "Annuler" }
+};
+const MultiLang* pauseMenu[3] = {
   resumeOption,
   newGameOption,
   undoOption
@@ -202,7 +223,7 @@ void loop() {
 
 void displayCpuLoad() {
   gb.display.setColor(WHITE);
-  gb.display.fillRect(0, 0, 12, 6);
+  gb.display.fillRect(0, 0, 12, REPEAT_FRAMES);
     
   gb.display.setCursor(0, 0);
   gb.display.setColor(BLACK);
@@ -225,17 +246,17 @@ void handleCommonButtons() {
 void handleSelectingButtons() {
   // Handle buttons when user is using the arrow cursor to navigate.
   Location originalLocation = activeLocation;
-  if (gb.buttons.repeat(BUTTON_RIGHT, 8)) {
+  if (gb.buttons.repeat(BUTTON_RIGHT, REPEAT_FRAMES)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {
       activeLocation = (Location)(activeLocation + 1);
     }
   }
-  if (gb.buttons.repeat(BUTTON_LEFT, 8)) {
+  if (gb.buttons.repeat(BUTTON_LEFT, REPEAT_FRAMES)) {
     if (activeLocation != stock && activeLocation != tableau1) {
       activeLocation = (Location)(activeLocation - 1);
     }
   }
-  if (gb.buttons.repeat(BUTTON_DOWN, 8)) {
+  if (gb.buttons.repeat(BUTTON_DOWN, REPEAT_FRAMES)) {
     if (cardIndex > 0) {
       cardIndex--;
     }
@@ -244,7 +265,7 @@ void handleSelectingButtons() {
       else if (activeLocation <= foundation4) activeLocation = (Location)(activeLocation + 7);
     }
   }
-  if (gb.buttons.repeat(BUTTON_UP, 8)) {
+  if (gb.buttons.repeat(BUTTON_UP, REPEAT_FRAMES)) {
     bool interPileNavigation = false;
     if (activeLocation >= tableau1 && activeLocation <= tableau7) {
       Pile *pile = getActiveLocationPile();
@@ -328,7 +349,7 @@ void handleSelectingButtons() {
         if (sourcePile->getCardCount() == 0) break;
         moving.empty();
         moving.x = sourcePile->x;
-        moving.y = cardYPosition(sourcePile, 0) - 2 * (cardIndex + 1);
+        moving.y = cardYPosition(sourcePile, 0) - 2 * cardIndex;
         sourcePile->removeCards(cardIndex + 1, &moving);
         mode = movingPile;
         playSoundA();
@@ -342,21 +363,21 @@ void handleSelectingButtons() {
 
 void handleMovingPileButtons() {
   // Handle buttons when user is moving a pile of cards.
-  if (gb.buttons.repeat(BUTTON_RIGHT, 8)) {
+  if (gb.buttons.repeat(BUTTON_RIGHT, REPEAT_FRAMES)) {
     if (activeLocation != foundation4 && activeLocation != tableau7) {
       activeLocation = (Location)(activeLocation + 1);
     }
   }
-  if (gb.buttons.repeat(BUTTON_LEFT, 8)) {
+  if (gb.buttons.repeat(BUTTON_LEFT, REPEAT_FRAMES)) {
     if (activeLocation != talon && activeLocation != tableau1) {
       activeLocation = (Location)(activeLocation - 1);
     }
   }
-  if (gb.buttons.repeat(BUTTON_DOWN, 8)) {
+  if (gb.buttons.repeat(BUTTON_DOWN, REPEAT_FRAMES)) {
     if (activeLocation == talon) activeLocation = tableau2;
     else if (activeLocation <= foundation4) activeLocation = (Location)(activeLocation + 7);
   }
-  if (gb.buttons.repeat(BUTTON_UP, 8)) {
+  if (gb.buttons.repeat(BUTTON_UP, REPEAT_FRAMES)) {
     if (activeLocation >= tableau4) activeLocation = (Location)(activeLocation - 7);
     else if (activeLocation >= tableau1) activeLocation = talon;
   }

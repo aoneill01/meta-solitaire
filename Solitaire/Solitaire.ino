@@ -6,6 +6,7 @@
 
 #define MAX_CARDS_DRAWN_IN_PILE 15
 #define REPEAT_FRAMES 6
+#define FRAME_RATE 30
 
 enum GameMode { dealing, selecting, drawingCards, movingPile, illegalMove, fastFoundation, wonGame };
 // State of the game.
@@ -119,7 +120,7 @@ const uint16_t patternB[] = {0x0045, 0x0108, 0x0000};
 
 void setup() {
   gb.begin();
-  gb.setFrameRate(30);
+  gb.setFrameRate(FRAME_RATE);
 
   // Initialize positions of piles.
   for (int i = 0; i < 4; i++) {
@@ -139,9 +140,50 @@ void setup() {
   talonDeck.y = 2;
   stockDeck.isTableau = false;
 
+  // titleScreenAnimation();
+  
   setupNewGame();
   
   // testWinningAnimation();
+}
+
+void titleScreenAnimation() {
+  stockDeck.newDeck();
+  stockDeck.shuffle();
+
+  int x, y;
+  
+  while (true) {
+    while (!gb.update());
+
+    int offset = gb.frameCount % (FRAME_RATE * 3);
+
+    gb.display.drawImage(0, 0, backgroundImage);
+    for (int i = 0; i < 16; i++) {
+      x = offset * 2 - 10 - i * 20;
+      while (x < -10) x += FRAME_RATE * 3 * 2;
+      Card card = stockDeck.getCard(i);
+      card.flip();
+      drawCard(x, i * 5 - 12, card);
+    }
+
+    gb.display.setFontSize(2);
+
+    x = 5;
+    y = 25;  
+    gb.display.setColor(WHITE);
+    gb.display.setCursor(x - 1, y);
+    gb.display.print("Solitaire");
+    gb.display.setCursor(x + 1, y);
+    gb.display.print("Solitaire");
+    gb.display.setCursor(x, y - 1);
+    gb.display.print("Solitaire");
+    gb.display.setCursor(x, y + 1);
+    gb.display.print("Solitaire");
+    gb.display.setColor(BLACK);
+    gb.display.setCursor(x, y);
+    gb.display.print("Solitaire");
+  }
 }
 
 void setupNewGame() {

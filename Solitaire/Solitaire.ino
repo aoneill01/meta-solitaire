@@ -141,10 +141,34 @@ void setup() {
   stockDeck.isTableau = false;
 
   // titleScreenAnimation();
+  iconAnimation();
   
   setupNewGame();
   
   // testWinningAnimation();
+}
+
+void iconAnimation() {
+  Image img(32, 32);
+
+  Pile one(3);
+  Pile two(4);
+  Pile three(5);
+
+  one.x = 1;
+  one.y = 1;
+  two.x = 12;
+  two.y = 1;
+  three.x = 23;
+  three.y = 1;
+  
+  img.startRecording("ICONGEN.GMV");
+
+  for (int i = 0; i < 30; i++) {
+    img.drawImage(0, -30, backgroundImage);
+  }
+
+  img.stopRecording(true);
 }
 
 void titleScreenAnimation() {
@@ -159,6 +183,7 @@ void titleScreenAnimation() {
     int offset = gb.frameCount % (FRAME_RATE * 3);
 
     gb.display.drawImage(0, 0, backgroundImage);
+    
     for (int i = 0; i < 16; i++) {
       x = offset * 2 - 10 - i * 20;
       while (x < -10) x += FRAME_RATE * 3 * 2;

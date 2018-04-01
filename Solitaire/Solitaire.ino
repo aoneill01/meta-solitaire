@@ -141,7 +141,7 @@ void setup() {
   stockDeck.isTableau = false;
 
   // titleScreenAnimation();
-  iconAnimation();
+  // iconAnimation();
   
   setupNewGame();
   
